@@ -1,5 +1,4 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
 import { v4 as uuidv4 } from "uuid";
 import { createApplication } from "../db.js";
 import { QUESTIONS } from "../questions.js";
@@ -7,17 +6,11 @@ import { sendNewApplicationEmail } from "../email.js";
 
 const router = Router();
 
-const submitLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: "Previše pokušaja. Pokušaj ponovo za 15 minuta." },
-});
-
 router.get("/questions", (_req, res) => {
   res.json({ questions: QUESTIONS });
 });
 
-router.post("/submit", submitLimiter, async (req, res) => {
+router.post("/submit", async (req, res) => {
   try {
     const { answers } = req.body;
     if (!answers || typeof answers !== "object") {
