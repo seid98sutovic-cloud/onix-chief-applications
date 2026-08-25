@@ -1,0 +1,36 @@
+# ONIX Chief PD Applications — Render.com free hosting
+services:
+  - type: web
+    name: onix-chief-applications
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: BASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_SECURE
+        value: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: NOTIFY_EMAIL
+        value: seid98sutovic@gmail.com
+      - key: EMAIL_FROM
+        value: "ONIX Roleplay <seid98sutovic@gmail.com>"

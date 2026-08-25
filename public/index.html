@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prijava za Chief of Police — ONIX Roleplay</title>
+  <meta name="description" content="Službena prijava za poziciju Chief of Police na ONIX Roleplay serveru.">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="site-header">
+      <div class="brand-badge"><span class="dot"></span> ONIX Roleplay — Staff Selekcija</div>
+      <h1>Prijava za Chief of Police</h1>
+      <p class="subtitle">
+        Službena selekcija za rukovodeću poziciju Los Santos Police Departmenta.
+        Ova forma nije prijava za običnog člana PD-a. Od kandidata se očekuje ozbiljnost,
+        aktivnost, poznavanje Medium RP-a i konkretan plan vođenja organizacije.
+      </p>
+    </header>
+
+    <div id="alert" class="alert alert-error hidden"></div>
+
+    <div id="form-view">
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-text" id="progress-text">0 / 27 pitanja popunjeno</div>
+      </div>
+      <form id="application-form"></form>
+      <div class="form-actions">
+        <button type="submit" form="application-form" class="btn btn-primary" id="submit-btn">
+          Pošalji prijavu
+        </button>
+      </div>
+    </div>
+
+    <div id="success-view" class="card success-panel hidden">
+      <div class="success-icon">✓</div>
+      <h2>Prijava uspješno zaprimljena</h2>
+      <p id="success-message"></p>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    © ONIX Roleplay — Chief of Police Application System
+  </footer>
+
+  <script src="/js/apply.js"></script>
+</body>
+</html>

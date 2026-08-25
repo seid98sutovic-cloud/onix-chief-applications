@@ -1,0 +1,28 @@
+{
+  "name": "onix-chief-applications",
+  "version": "1.0.0",
+  "description": "ONIX Roleplay — Chief of Police application system",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "setup-admin": "node server/setup-admin.js",
+    "setup-email": "node server/setup-email.js",
+    "test-email": "node server/test-email.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.16",
+    "uuid": "^11.0.3"
+  }
+}

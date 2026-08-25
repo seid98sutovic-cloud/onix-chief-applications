@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Chief PD Prijave | ONIX Roleplay</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="login-view" class="login-wrap hidden">
+    <div class="login-card">
+      <h1>ONIX Admin Panel</h1>
+      <p class="sub">Chief of Police — pregled prijava</p>
+      <div id="login-alert" class="alert alert-error hidden"></div>
+      <form id="login-form">
+        <div class="field">
+          <label for="username">Korisničko ime</label>
+          <input type="text" id="username" name="username" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="password">Lozinka</label>
+          <input type="password" id="password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Prijava</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="admin-view" class="admin-shell hidden">
+    <aside class="admin-sidebar">
+      <div class="admin-brand">
+        <div class="admin-brand-mark">OX</div>
+        <div>
+          <h2>ONIX Staff</h2>
+          <p>Chief PD Prijave</p>
+        </div>
+      </div>
+      <nav class="admin-nav">
+        <button type="button" id="nav-list" class="active">📋 Sve prijave</button>
+      </nav>
+      <div style="margin-top:auto;padding-top:16px;">
+        <button type="button" id="logout-btn" class="btn btn-ghost" style="width:100%;">Odjava</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <div id="list-page">
+        <div class="admin-topbar">
+          <h1>Prijave za Chief of Police</h1>
+          <span class="muted" id="admin-user"></span>
+        </div>
+
+        <div class="stats-grid" id="stats-grid"></div>
+
+        <div class="toolbar">
+          <input type="search" id="search-input" placeholder="Pretraži po Discord, IC imenu, ID-u...">
+          <select id="status-filter">
+            <option value="">Svi statusi</option>
+            <option value="novo">Novo</option>
+            <option value="u_razmatranju">U razmatranju</option>
+            <option value="prihvacen">Prihvaćen</option>
+            <option value="odbijen">Odbijen</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Datum</th>
+                <th>Discord</th>
+                <th>IC Ime</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="applications-tbody">
+              <tr><td colspan="5" class="empty-state">Učitavanje...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="detail-page" class="hidden">
+        <div class="detail-header">
+          <div>
+            <button type="button" class="btn btn-ghost" id="back-btn">← Nazad na listu</button>
+            <h1 style="margin-top:12px;" id="detail-title">Prijave</h1>
+          </div>
+          <div>
+            <select id="status-select" class="field" style="width:auto;padding:10px 14px;"></select>
+          </div>
+        </div>
+
+        <div class="detail-meta" id="detail-meta"></div>
+        <div id="detail-answers"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
