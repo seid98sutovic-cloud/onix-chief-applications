@@ -1,25 +1,23 @@
-# ONIX Chief PD Applications — Render.com free hosting
+# ONIX Chief PD Applications — Render.com (besplatno 24/7)
+# Deploy: https://dashboard.render.com/blueprint/new?repo=https://github.com/seid98sutovic-cloud/onix-chief-applications
+
 services:
   - type: web
     name: onix-chief-applications
     runtime: node
     plan: free
+    repo: https://github.com/seid98sutovic-cloud/onix-chief-applications
+    branch: main
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
-      - key: BASE_URL
-        sync: false
-      - key: JWT_SECRET
-        generateValue: true
       - key: ADMIN_USERNAME
         value: admin
-      - key: ADMIN_PASSWORD
-        sync: false
+      - key: NOTIFY_EMAIL
+        value: seid98sutovic@gmail.com
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
@@ -27,10 +25,14 @@ services:
       - key: SMTP_SECURE
         value: false
       - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: NOTIFY_EMAIL
         value: seid98sutovic@gmail.com
       - key: EMAIL_FROM
         value: "ONIX Roleplay <seid98sutovic@gmail.com>"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BASE_URL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SMTP_PASS
+        sync: false

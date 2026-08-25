@@ -1,0 +1,13 @@
+name: Keep ONIX Chief app awake (Render free tier)
+
+on:
+  schedule:
+    - cron: "*/14 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: curl -fsS "https://onix-chief-applications.onrender.com/api/health"
