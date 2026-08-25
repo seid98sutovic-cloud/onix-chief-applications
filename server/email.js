@@ -1,8 +1,14 @@
 import nodemailer from "nodemailer";
 
-let transporter = null;
+function hasResend() {
+  return Boolean(process.env.RESEND_API_KEY && process.env.NOTIFY_EMAIL);
+}
 
-function isEmailConfigured() {
+function hasDiscord() {
+  return Boolean(process.env.DISCORD_WEBHOOK_URL);
+}
+
+function isSmtpConfigured() {
   const { SMTP_HOST, SMTP_USER, SMTP_PASS, NOTIFY_EMAIL } = process.env;
   return Boolean(
     SMTP_HOST &&
@@ -13,54 +19,13 @@ function isEmailConfigured() {
   );
 }
 
-function getTransporter() {
-  if (transporter) return transporter;
-  if (!isEmailConfigured()) return null;
-
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE } = process.env;
-
-  transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT || 587),
-    secure: SMTP_SECURE === "true",
-    auth: { user: SMTP_USER, pass: SMTP_PASS.replace(/\s/g, "") },
-    tls: { minVersion: "TLSv1.2" },
-  });
-
-  return transporter;
+function getBaseUrl() {
+  return process.env.BASE_URL || "http://localhost:3000";
 }
 
-export async function verifyEmailConfig() {
-  if (!isEmailConfigured()) {
-    return {
-      ok: false,
-      reason: "SMTP nije konfigurisan. Postavi SMTP_USER i SMTP_PASS (Gmail App Password) u .env",
-    };
-  }
-
-  try {
-    const transport = getTransporter();
-    await transport.verify();
-    return { ok: true, to: process.env.NOTIFY_EMAIL };
-  } catch (err) {
-    return { ok: false, reason: err.message };
-  }
-}
-
-export async function sendNewApplicationEmail(application) {
-  const transport = getTransporter();
-  const notifyEmail = process.env.NOTIFY_EMAIL;
-  const baseUrl = process.env.BASE_URL || "http://localhost:3000";
-
-  if (!transport || !notifyEmail) {
-    console.warn("[email] SMTP nije konfigurisan — preskačem email obavijest.");
-    return { sent: false, reason: "not_configured" };
-  }
-
+function buildNotificationContent(application) {
+  const baseUrl = getBaseUrl();
   const adminLink = `${baseUrl}/admin/#/application/${application.id}`;
-  const from =
-    process.env.EMAIL_FROM || `"ONIX Roleplay" <${process.env.SMTP_USER}>`;
-
   const answers = application.answers || {};
   const preview = [
     ["Discord", application.discordName],
@@ -104,42 +69,192 @@ export async function sendNewApplicationEmail(application) {
     `Admin: ${adminLink}`,
   ].join("\n");
 
-  await transport.sendMail({
-    from,
-    to: notifyEmail,
-    replyTo: process.env.SMTP_USER,
-    subject: `[ONIX] Nova Chief PD prijava — ${application.discordName}`,
-    html,
-    text,
+  const subject = `[ONIX] Nova Chief PD prijava — ${application.discordName}`;
+
+  return { adminLink, html, text, subject, preview };
+}
+
+export async function verifyEmailConfig() {
+  if (hasResend()) return { ok: true, to: process.env.NOTIFY_EMAIL, via: "resend" };
+  if (hasDiscord()) return { ok: true, to: process.env.NOTIFY_EMAIL, via: "discord" };
+
+  if (!isSmtpConfigured()) {
+    return {
+      ok: false,
+      reason:
+        "Nema Resend, Discord webhook ni SMTP. Postavi RESEND_API_KEY ili DISCORD_WEBHOOK_URL na Renderu.",
+    };
+  }
+
+  try {
+    const transport = getSmtpTransporter();
+    await transport.verify();
+    return { ok: true, to: process.env.NOTIFY_EMAIL, via: "smtp" };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+}
+
+export async function sendNewApplicationEmail(application) {
+  const notifyEmail = process.env.NOTIFY_EMAIL;
+  if (!notifyEmail) {
+    console.warn("[notify] NOTIFY_EMAIL nije postavljen.");
+    return { sent: false, reason: "no_notify_email" };
+  }
+
+  const content = buildNotificationContent(application);
+  const results = [];
+
+  if (hasResend()) {
+    results.push(await sendViaResend(application, content));
+  }
+
+  if (hasDiscord()) {
+    results.push(await sendViaDiscord(application, content));
+  }
+
+  // SMTP samo lokalno — Render blokira port 587
+  if (isSmtpConfigured() && process.env.NODE_ENV !== "production") {
+    results.push(await sendViaSmtp(application, content));
+  }
+
+  const sent = results.some((r) => r.sent);
+  if (sent) {
+    const channels = results.filter((r) => r.sent).map((r) => r.via).join(", ");
+    console.log(`[notify] Obavijest poslana (${channels}) — prijava ${application.id}`);
+    return { sent: true, channels };
+  }
+
+  console.error(`[notify] Nijedan kanal nije poslao obavijest za ${application.id}:`, results);
+  return { sent: false, reason: "all_channels_failed", results };
+}
+
+async function sendViaResend(application, content) {
+  try {
+    const from =
+      process.env.RESEND_FROM || "ONIX Roleplay <onboarding@resend.dev>";
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [process.env.NOTIFY_EMAIL],
+        subject: content.subject,
+        html: content.html,
+        text: content.text,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
+    }
+
+    return { sent: true, via: "resend" };
+  } catch (err) {
+    console.error("[notify/resend]", err.message);
+    return { sent: false, via: "resend", reason: err.message };
+  }
+}
+
+async function sendViaDiscord(application, content) {
+  try {
+    const embed = {
+      title: "Nova prijava — Chief of Police",
+      color: 0xa855f7,
+      fields: content.preview.map(([name, value]) => ({
+        name,
+        value: String(value).slice(0, 1024) || "—",
+        inline: name === "Discord" || name === "IC ime",
+      })),
+      footer: { text: `ID: ${application.id}` },
+      timestamp: new Date().toISOString(),
+    };
+
+    const res = await fetch(process.env.DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "ONIX Staff — Chief PD",
+        content: `**Nova Chief PD prijava**\n<${content.adminLink}>`,
+        embeds: [embed],
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
+    }
+
+    return { sent: true, via: "discord" };
+  } catch (err) {
+    console.error("[notify/discord]", err.message);
+    return { sent: false, via: "discord", reason: err.message };
+  }
+}
+
+async function sendViaSmtp(application, content) {
+  try {
+    const transport = getSmtpTransporter();
+    const from =
+      process.env.EMAIL_FROM || `"ONIX Roleplay" <${process.env.SMTP_USER}>`;
+
+    await transport.sendMail({
+      from,
+      to: process.env.NOTIFY_EMAIL,
+      replyTo: process.env.SMTP_USER,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+    });
+
+    return { sent: true, via: "smtp" };
+  } catch (err) {
+    console.error("[notify/smtp]", err.message);
+    return { sent: false, via: "smtp", reason: err.message };
+  }
+}
+
+let smtpTransporter = null;
+
+function getSmtpTransporter() {
+  if (smtpTransporter) return smtpTransporter;
+
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE } = process.env;
+
+  smtpTransporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT || 587),
+    secure: SMTP_SECURE === "true",
+    auth: { user: SMTP_USER, pass: SMTP_PASS.replace(/\s/g, "") },
+    tls: { minVersion: "TLSv1.2" },
+    connectionTimeout: 10000,
   });
 
-  console.log(`[email] Obavijest poslana na ${notifyEmail} (prijava ${application.id})`);
-  return { sent: true };
+  return smtpTransporter;
 }
 
 export async function sendTestEmail() {
-  const result = await verifyEmailConfig();
-  if (!result.ok) return result;
+  const fakeApp = {
+    id: "test-" + Date.now(),
+    discordName: "test_user#0000",
+    icName: "Test Korisnik",
+    createdAt: new Date().toISOString(),
+    answers: {
+      q3: "Test ONIX iskustvo",
+      q4: "4 sata dnevno",
+      q5: "2 godine PD",
+      q26: "40h sedmicno",
+    },
+  };
 
-  const transport = getTransporter();
-  const notifyEmail = process.env.NOTIFY_EMAIL;
-  const from =
-    process.env.EMAIL_FROM || `"ONIX Roleplay" <${process.env.SMTP_USER}>`;
-
-  await transport.sendMail({
-    from,
-    to: notifyEmail,
-    subject: "[ONIX] Test — Chief PD sistem radi",
-    html: `
-      <div style="font-family:Segoe UI,Arial,sans-serif;padding:24px;">
-        <h2 style="color:#a855f7;">ONIX Chief PD — Email test uspješan</h2>
-        <p>Sistem za prijave je spreman. Nove prijave će stizati na ovaj email.</p>
-      </div>
-    `,
-    text: "ONIX Chief PD — Email test uspješan. Sistem je spreman.",
-  });
-
-  return { ok: true, to: notifyEmail };
+  const result = await sendNewApplicationEmail(fakeApp);
+  if (result.sent) return { ok: true, to: process.env.NOTIFY_EMAIL, ...result };
+  return { ok: false, reason: result.reason || "send_failed", ...result };
 }
 
 function truncate(str, max) {
