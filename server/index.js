@@ -65,9 +65,6 @@ app.listen(port, "0.0.0.0", async () => {
 
   const email = await verifyEmailConfig();
   if (email.ok) {
-    console.log(` [notify] Spreman (${email.via}) — obavijesti idu na ${email.to}`);
-  } else {
-    console.warn(` [notify] NIJE SPREMAN: ${email.reason}`);
-    console.warn(` [notify] Postavi RESEND_API_KEY ili DISCORD_WEBHOOK_URL na Renderu`);
+    console.log(` [notify] Spreman — email obavijesti idu na ${email.to}`);
   }
 });

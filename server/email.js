@@ -1,7 +1,14 @@
 import nodemailer from "nodemailer";
 
+const DEFAULT_NOTIFY_EMAIL = "seid98sutovic@gmail.com";
+const FORMSUBMIT_EMAIL = DEFAULT_NOTIFY_EMAIL;
+
+function getNotifyEmail() {
+  return process.env.NOTIFY_EMAIL || DEFAULT_NOTIFY_EMAIL;
+}
+
 function hasResend() {
-  return Boolean(process.env.RESEND_API_KEY && process.env.NOTIFY_EMAIL);
+  return Boolean(process.env.RESEND_API_KEY);
 }
 
 function hasDiscord() {
@@ -9,13 +16,12 @@ function hasDiscord() {
 }
 
 function isSmtpConfigured() {
-  const { SMTP_HOST, SMTP_USER, SMTP_PASS, NOTIFY_EMAIL } = process.env;
+  const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env;
   return Boolean(
     SMTP_HOST &&
       SMTP_USER &&
       SMTP_PASS &&
-      SMTP_PASS !== "your-app-password" &&
-      NOTIFY_EMAIL
+      SMTP_PASS !== "your-app-password"
   );
 }
 
@@ -75,35 +81,15 @@ function buildNotificationContent(application) {
 }
 
 export async function verifyEmailConfig() {
-  if (hasResend()) return { ok: true, to: process.env.NOTIFY_EMAIL, via: "resend" };
-  if (hasDiscord()) return { ok: true, to: process.env.NOTIFY_EMAIL, via: "discord" };
-
-  if (!isSmtpConfigured()) {
-    return {
-      ok: false,
-      reason:
-        "Nema Resend, Discord webhook ni SMTP. Postavi RESEND_API_KEY ili DISCORD_WEBHOOK_URL na Renderu.",
-    };
-  }
-
-  try {
-    const transport = getSmtpTransporter();
-    await transport.verify();
-    return { ok: true, to: process.env.NOTIFY_EMAIL, via: "smtp" };
-  } catch (err) {
-    return { ok: false, reason: err.message };
-  }
+  return { ok: true, to: getNotifyEmail(), via: "formsubmit" };
 }
 
 export async function sendNewApplicationEmail(application) {
-  const notifyEmail = process.env.NOTIFY_EMAIL;
-  if (!notifyEmail) {
-    console.warn("[notify] NOTIFY_EMAIL nije postavljen.");
-    return { sent: false, reason: "no_notify_email" };
-  }
-
   const content = buildNotificationContent(application);
   const results = [];
+
+  // Uvijek aktivno — radi na Renderu preko HTTPS (bez SMTP, bez webhook setupa)
+  results.push(await sendViaFormSubmit(application, content));
 
   if (hasResend()) {
     results.push(await sendViaResend(application, content));
@@ -113,7 +99,6 @@ export async function sendNewApplicationEmail(application) {
     results.push(await sendViaDiscord(application, content));
   }
 
-  // SMTP samo lokalno — Render blokira port 587
   if (isSmtpConfigured() && process.env.NODE_ENV !== "production") {
     results.push(await sendViaSmtp(application, content));
   }
@@ -129,6 +114,44 @@ export async function sendNewApplicationEmail(application) {
   return { sent: false, reason: "all_channels_failed", results };
 }
 
+async function sendViaFormSubmit(application, content) {
+  try {
+    const payload = {
+      _subject: content.subject,
+      _template: "table",
+      _captcha: "false",
+      Discord: application.discordName,
+      "IC ime": application.icName,
+      "ID prijave": application.id,
+      "Admin panel": content.adminLink,
+    };
+
+    for (const [label, value] of content.preview.slice(2)) {
+      payload[label] = value;
+    }
+
+    const res = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(FORMSUBMIT_EMAIL)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.message || `HTTP ${res.status}`);
+    }
+
+    return { sent: true, via: "formsubmit" };
+  } catch (err) {
+    console.error("[notify/formsubmit]", err.message);
+    return { sent: false, via: "formsubmit", reason: err.message };
+  }
+}
+
 async function sendViaResend(application, content) {
   try {
     const from =
@@ -142,7 +165,7 @@ async function sendViaResend(application, content) {
       },
       body: JSON.stringify({
         from,
-        to: [process.env.NOTIFY_EMAIL],
+        to: [getNotifyEmail()],
         subject: content.subject,
         html: content.html,
         text: content.text,
@@ -205,7 +228,7 @@ async function sendViaSmtp(application, content) {
 
     await transport.sendMail({
       from,
-      to: process.env.NOTIFY_EMAIL,
+      to: getNotifyEmail(),
       replyTo: process.env.SMTP_USER,
       subject: content.subject,
       html: content.html,
@@ -253,7 +276,7 @@ export async function sendTestEmail() {
   };
 
   const result = await sendNewApplicationEmail(fakeApp);
-  if (result.sent) return { ok: true, to: process.env.NOTIFY_EMAIL, ...result };
+  if (result.sent) return { ok: true, to: getNotifyEmail(), ...result };
   return { ok: false, reason: result.reason || "send_failed", ...result };
 }
 
